@@ -118,8 +118,15 @@ main(int argc, char *argv[1])
 	int tmpfd;
 	pid_t pid;
 
+	if (argc == 2)
+		dir = argv[1];
+	else if (argc == 3) {
+		service = argv[1];
+		dir = argv[2];
+	} else
+		die("usage: %s [service] directory", argv[0]);
+
 	initsock();
-	dir = getenv("HOME");
 
 	for (;;) {
 		if ((tmpfd = accept(sockfd, 0, 0)) < 0) {
