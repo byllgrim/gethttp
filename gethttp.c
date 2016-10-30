@@ -15,6 +15,7 @@ static void die(char *fmt, ...);
 static void initsock(void);
 static void handleconn(int fd);
 static void respond(int fd, char *path);
+static char *filepath(char *path);
 
 /* global variables */
 static int sockfd;
@@ -82,7 +83,7 @@ handleconn(int fd)
 
 	bzero(buf, sizeof(buf));
 	read(fd, buf, BUFSIZ);
-	//printf("received: %s", buf);
+	printf("====received====\n%s", buf);
 
 	if (!strcmp(strtok(buf, " "), "GET"))
 		respond(fd, strtok(NULL, " "));
@@ -95,11 +96,10 @@ respond(int fd, char *path)
 	char *file;
 	char *msg;
 	int tmpfd;
+printf("path = %s\n", path);
 
-	file = calloc(BUFSIZ, sizeof(char));
-	strncat(file, dir, BUFSIZ/3);
-	strncat(file, path, BUFSIZ/3);
-	strncat(file, defaultdoc, BUFSIZ/3);
+	file = filepath(path);
+printf("file = %s\n", file);
 	if ((tmpfd = open(file, O_RDONLY)) < 0) {
 		buf = strerror(errno);
 		/* TODO 404 Not found */
@@ -113,6 +113,20 @@ respond(int fd, char *path)
 	strncat(msg, buf, BUFSIZ);
 	send(fd, msg, strlen(msg), 0);
 	/* TODO free */
+}
+
+char *
+filepath(char *path)
+{
+	char *file;
+
+	file = calloc(BUFSIZ, sizeof(char));
+	strncat(file, dir, BUFSIZ/3);
+	strncat(file, path, BUFSIZ/3);
+	if (!strchr(path, '.'))
+		strncat(file, defaultdoc, BUFSIZ/3);
+
+	return file;
 }
 
 int
