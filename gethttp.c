@@ -14,12 +14,14 @@
 static void die(char *fmt, ...);
 static void initsock(void);
 static void handleconn(int fd);
-static void respond(int fd);
+static void respond(int fd, char *path);
 
 /* global variables */
 static int sockfd;
 static char *service = "http-alt";
-static char defaultdoc[] = "index.html";
+static char *dir = NULL;
+static char defaultdoc[] = "/index.html";
+static char getresponse[] = "HTTP/1.0 200 OK\nContent-Type: text/html\n\n";
 
 /* function definitions */
 void
@@ -83,26 +85,31 @@ handleconn(int fd)
 	//printf("received: %s", buf);
 
 	if (!strcmp(strtok(buf, " "), "GET"))
-		printf("GET\n");
-	strtok(NULL, " ");
-
-	respond(fd);
+		respond(fd, strtok(NULL, " "));
 }
 
 void
-respond(int fd)
+respond(int fd, char *path)
 {
-	char buf[BUFSIZ+1];
+	char buf[BUFSIZ];
+	char *file;
+	char *msg;
 	int tmpfd;
 
-	tmpfd = open("/home/robin/tmp/RESPONS", O_RDONLY);
-	bzero(buf, sizeof(buf));
-	read(tmpfd, buf, BUFSIZ);
+	file = calloc(BUFSIZ, sizeof(char));
+	strncat(file, dir, BUFSIZ/3);
+	strncat(file, path, BUFSIZ/3);
+	strncat(file, defaultdoc, BUFSIZ/3);
+	if ((tmpfd = open(file, O_RDONLY)) < 0)
+		die("open: %s\n", strerror(errno));
 
-	strcpy(buf, "HTTP/1.0 200 OK\n"
-	            "Content-Type: text/html\n\n"
-	            "gethttp");
-	send(fd, buf, sizeof(buf), 0);
+	bzero(buf, sizeof(buf));
+	read(tmpfd, buf, sizeof(buf) - 1);
+
+	msg = calloc(sizeof(getresponse) + sizeof(buf), sizeof(char));
+	strncat(msg, getresponse, sizeof(getresponse));
+	strncat(msg, buf, sizeof(buf));
+	send(fd, msg, strlen(msg), 0);
 }
 
 int
@@ -112,6 +119,7 @@ main(int argc, char *argv[1])
 	pid_t pid;
 
 	initsock();
+	dir = getenv("HOME");
 
 	for (;;) {
 		if ((tmpfd = accept(sockfd, 0, 0)) < 0) {
