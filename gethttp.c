@@ -91,7 +91,7 @@ handleconn(int fd)
 void
 respond(int fd, char *path)
 {
-	char buf[BUFSIZ];
+	char *buf;
 	char *file;
 	char *msg;
 	int tmpfd;
@@ -100,16 +100,19 @@ respond(int fd, char *path)
 	strncat(file, dir, BUFSIZ/3);
 	strncat(file, path, BUFSIZ/3);
 	strncat(file, defaultdoc, BUFSIZ/3);
-	if ((tmpfd = open(file, O_RDONLY)) < 0)
-		die("open: %s\n", strerror(errno));
+	if ((tmpfd = open(file, O_RDONLY)) < 0) {
+		buf = strerror(errno);
+		/* TODO 404 Not found */
+	} else {
+		buf = calloc(BUFSIZ + 1, sizeof(char));
+		read(tmpfd, buf, BUFSIZ);
+	}
 
-	bzero(buf, sizeof(buf));
-	read(tmpfd, buf, sizeof(buf) - 1);
-
-	msg = calloc(sizeof(getresponse) + sizeof(buf), sizeof(char));
+	msg = calloc(sizeof(getresponse) + BUFSIZ, sizeof(char));
 	strncat(msg, getresponse, sizeof(getresponse));
-	strncat(msg, buf, sizeof(buf));
+	strncat(msg, buf, BUFSIZ);
 	send(fd, msg, strlen(msg), 0);
+	/* TODO free */
 }
 
 int
