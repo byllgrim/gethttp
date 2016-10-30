@@ -3,6 +3,7 @@
 #include <netdb.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,11 +12,14 @@
 
 /* function declarations */
 static void die(char *fmt, ...);
-static int initsock(void);
+static void initsock(void);
 static void handleconn(int fd);
+static void respond(int fd);
 
 /* global variables */
+static int sockfd;
 static char *service = "http-alt";
+static char defaultdoc[] = "index.html";
 
 /* function definitions */
 void
@@ -37,12 +41,12 @@ die(char *fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
-int
+void
 initsock(void)
 {
 	struct addrinfo hints;
 	struct addrinfo *res;
-	int err, fd, one = 1;
+	int err, one = 1;
 
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
@@ -53,21 +57,20 @@ initsock(void)
 		exit(EXIT_FAILURE);
 	}
 
-	fd = socket(res->ai_family,res->ai_socktype,res->ai_protocol);
-	if (fd < 0)
+	sockfd = socket(res->ai_family,res->ai_socktype,res->ai_protocol);
+	if (sockfd < 0)
 		die("socket: %s", strerror(errno));
 
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)))
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)))
 		die("setsockopt: %s", strerror(errno));
 
-	if (bind(fd, res->ai_addr, res->ai_addrlen))
+	if (bind(sockfd, res->ai_addr, res->ai_addrlen))
 		die("bind: %s", strerror(errno));
 
-	if (listen(fd, SOMAXCONN))
+	if (listen(sockfd, SOMAXCONN))
 		die("listen: %s", strerror(errno));
 
 	freeaddrinfo(res);
-	return fd;
 }
 
 void
@@ -77,16 +80,38 @@ handleconn(int fd)
 
 	bzero(buf, sizeof(buf));
 	read(fd, buf, BUFSIZ);
-	printf("received: %s", buf);
+	//printf("received: %s", buf);
+
+	if (!strcmp(strtok(buf, " "), "GET"))
+		printf("GET\n");
+	strtok(NULL, " ");
+
+	respond(fd);
+}
+
+void
+respond(int fd)
+{
+	char buf[BUFSIZ+1];
+	int tmpfd;
+
+	tmpfd = open("/home/robin/tmp/RESPONS", O_RDONLY);
+	bzero(buf, sizeof(buf));
+	read(tmpfd, buf, BUFSIZ);
+
+	strcpy(buf, "HTTP/1.0 200 OK\n"
+	            "Content-Type: text/html\n\n"
+	            "gethttp");
+	send(fd, buf, sizeof(buf), 0);
 }
 
 int
 main(int argc, char *argv[1])
 {
-	int sockfd, tmpfd;
+	int tmpfd;
 	pid_t pid;
 
-	sockfd = initsock();
+	initsock();
 
 	for (;;) {
 		if ((tmpfd = accept(sockfd, 0, 0)) < 0) {
